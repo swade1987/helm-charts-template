@@ -1,0 +1,252 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Release.Name }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app.kubernetes.io/instance: {{ $.Release.Name }}
+    app.kubernetes.io/name: {{ $.Release.Name }}
+    app.kubernetes.io/subsystem: {{ $.Values.application.subsystem | quote }}
+    app.kubernetes.io/tenant: {{ $.Values.tenant.name | quote }}
+    app.kubernetes.io/version: {{ $.Values.application.image.tag | quote }}
+    app: {{ $.Release.Name }}
+    helm.sh/chart: {{ $.Chart.Name }}-{{ $.Chart.Version }}
+  annotations:
+    reloader.stakater.com/auto: "true"
+spec:
+  minReadySeconds: {{ .Values.application.minReadySeconds }}
+  replicas: {{ .Values.application.replicaCount }}
+  {{- if .Values.application.strategy }}
+  strategy:
+{{- .Values.application.strategy | toYaml | nindent 4 }}
+  {{- end }}
+  selector:
+    matchLabels:
+      app: {{ .Release.Name }}
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/instance: {{ $.Release.Name }}
+        app.kubernetes.io/name: {{ $.Release.Name }}
+        app.kubernetes.io/subsystem: {{ $.Values.application.subsystem | quote }}
+        app.kubernetes.io/version: {{ $.Values.application.image.tag | quote }}
+        app: {{ $.Release.Name }}
+        helm.sh/chart: {{ $.Chart.Name }}-{{ $.Chart.Version }}
+      annotations:
+        {{- if .Values.istio.enabled }}
+        sidecar.istio.io/inject: "true"
+        {{ include "backend.istioExcludedOutboundPortsAnnotation" . }}
+        {{ include "backend.istioExcludeOutboundIPRangesAnnotation" . }}
+        {{- end }}
+  {{- with .Values.application.podAnnotations }}
+{{ toYaml . | indent 8 }}
+  {{- end }}
+    spec:
+      serviceAccountName: {{ .Release.Name }}
+{{- with .Values.application.nodeSelector }}
+      nodeSelector:
+{{ toYaml . | indent 8 }}
+{{- end }}
+{{- with .Values.application.tolerations }}
+      tolerations:
+{{ toYaml . | indent 8 }}
+{{- end }}
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                labelSelector:
+                  matchExpressions:
+                    - key: app
+                      operator: In
+                      values:
+                        - {{ .Release.Name }}
+                topologyKey: topology.kubernetes.io/zone
+            - weight: 50
+              podAffinityTerm:
+                labelSelector:
+                  matchExpressions:
+                    - key: app
+                      operator: In
+                      values:
+                        - {{ .Release.Name }}
+                topologyKey: kubernetes.io/hostname
+      {{- if .Values.application.imagePullSecretName }}
+      imagePullSecrets:
+        - name: {{ .Values.application.imagePullSecretName }}
+      {{- end }}
+      {{- if .Values.podSecurityContext }}
+      securityContext:
+{{ toYaml .Values.podSecurityContext | indent 8 }}
+      {{- end }}
+{{- if .Values.application.additionalInitContainers }}
+      initContainers:
+  {{- if .Values.application.additionalInitContainers }}
+  {{- ( tpl (toYaml .Values.application.additionalInitContainers) . ) | nindent 8 }}
+  {{- end }}
+{{- end }}
+      containers:
+        - name: {{ .Release.Name }}
+          image: {{ .Values.application.image.repository }}:{{ .Values.application.image.tag }}
+          imagePullPolicy: {{ .Values.application.image.pullPolicy }}
+          {{- if .Values.securityContexts.application }}
+          securityContext:
+{{ toYaml .Values.securityContexts.application | indent 12 }}
+          {{- end }}
+          {{- if .Values.application.args }}
+          args:
+{{ toYaml .Values.application.args | indent 12 }}
+          {{- end }}
+          envFrom:
+          {{- if .Values.application.externalSecrets.database  }}
+            - secretRef:
+                name: {{ if .Values.application.dbAccess.existingSecretName }}{{ .Values.application.dbAccess.existingSecretName }}{{ else }}{{ .Release.Name }}-db-{{ .Release.Revision }}{{ end }}
+          {{- end }}
+          {{- if .Values.application.externalSecrets.application }}
+            - secretRef:
+                name: {{ .Release.Name }}-app-{{ .Release.Revision }}
+          {{- end }}
+          {{- if .Values.application.externalSecrets.additional }}
+          {{- range .Values.application.externalSecrets.additional }}
+            - secretRef:
+                name: {{ $.Release.Name }}-{{ .name }}-{{ $.Release.Revision }}
+          {{- end }}
+          {{- end }}
+          {{- if .Values.mongo.enabled }}
+            - secretRef:
+                name: {{ .Release.Name }}-mongodb-password-{{ .Release.Revision }}
+          {{- end }}
+          env:
+            - name: ENVIRONMENT
+              value: {{ .Values.environment | quote}}
+            - name: APM_SERVER_URL
+              value: {{ .Values.apm.serverUrl | quote}}
+            - name: ELASTIC_APM_ENVIRONMENT
+              value: {{ .Values.environment | quote}}
+            - name: TENANT_ID
+              value: {{ .Values.tenant.id | quote }}
+            {{- if .Values.kafka.enabled }}
+            - name: KAFKA_HOSTS
+              value: "{{ .Values.kafka.clusterName }}-kafka-bootstrap.kafka.svc.cluster.local:9093"
+            - name: SCHEMA_REGISTRY_URL
+              value: {{ default "http://algbra-schema-registry.microservices.svc.cluster.local:8081" .Values.kafka.schemaRegistryUrl | quote }}
+            - name: KAFKA_CA_FILE_PATH
+              value: /kafka-ca-certs/ca.crt
+            - name: KAFKA_CRT_FILE_PATH
+              value: /kafka-client-certs/user.crt
+            - name: KAFKA_KEY_FILE_PATH
+              value: /kafka-client-certs/user.key
+            {{- end }}
+          {{- range $key, $value := .Values.application.env }}
+            - name: "{{ $key }}"
+              value: "{{ $value }}"
+          {{- end }}
+            # Generic envFromSecrets
+          {{- range $secret := .Values.application.envFromSecret }}
+            - name: "{{ $secret.name }}"
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $secret.secretName }}
+                  key: {{ $secret.secretKeyRef }}
+          {{- end }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.application.container.tcpPort }}
+            - name: tcp
+              containerPort: {{ .Values.application.container.tcpPort }}
+            {{- range $additionalPorts := .Values.application.additionalPorts }}
+            - name: "{{ $additionalPorts.name }}"
+              containerPort: {{ $additionalPorts.containerPort }}
+            {{- end }}
+          livenessProbe:
+{{ toYaml .Values.application.livenessProbe | indent 12 }}
+          readinessProbe:
+{{ toYaml .Values.application.readinessProbe | indent 12 }}
+          startupProbe:
+{{ toYaml .Values.application.startupProbe | indent 12 }}
+          resources:
+{{ toYaml .Values.application.resources | indent 12 }}
+
+{{- $hasDefaultVolumes := not (empty (concat .Values.application.volumes.secretVolumes .Values.application.volumes.configMapVolumes .Values.application.volumes.emptyDirVolumes .Values.application.volumes.persistentVolumes)) }}
+{{- $hasKafka := .Values.kafka.enabled }}
+{{- $hasMongo := .Values.mongo.enabled }}
+{{- if or $hasDefaultVolumes $hasKafka $hasMongo }}
+          volumeMounts:
+            {{- range $volumeMount := .Values.application.volumes.secretVolumes }}
+            - name: "{{ $.Release.Name }}-{{ $volumeMount.name }}"
+              mountPath: "{{ $volumeMount.mountPath }}"
+              readOnly: true
+            {{- end }}
+
+            {{- range $volumeMount := .Values.application.volumes.configMapVolumes }}
+            - name: "{{ $.Release.Name }}-{{ $volumeMount.name }}"
+              mountPath: "{{ $volumeMount.mountPath }}"
+              subPath: "{{ $volumeMount.subPath }}"
+              readOnly: true
+            {{- end }}
+
+            {{- range $volumeMount := (concat .Values.application.volumes.emptyDirVolumes .Values.application.volumes.persistentVolumes) }}
+            - name: "{{ $.Release.Name }}-{{ $volumeMount.name }}"
+              mountPath: "{{ $volumeMount.mountPath }}"
+            {{- end }}
+
+            {{- if $hasKafka }}
+            - mountPath: /kafka-client-certs
+              name: kafka-client-certs
+            - mountPath: /kafka-ca-certs
+              name: kafka-ca-certs
+            {{- end }}
+
+            {{- if $hasMongo }}
+            - mountPath: /ca-cert
+              name: ca-cert
+            - mountPath: /client-certs
+              name: client-certs
+            {{- end }}
+
+{{- end }}
+        {{- if .Values.application.additionalContainers }}
+        {{- ( tpl (toYaml .Values.application.additionalContainers) . ) | nindent 8 }}
+        {{- end }}
+
+{{- if or $hasDefaultVolumes $hasKafka $hasMongo }}
+      volumes:
+        {{- range $volume := .Values.application.volumes.secretVolumes }}
+        - name: "{{ $.Release.Name }}-{{ $volume.name }}"
+          secret:
+            secretName: "{{ $volume.secretName }}"
+        {{- end }}
+        {{- range $volume := .Values.application.volumes.configMapVolumes }}
+        - name: "{{ $.Release.Name }}-{{ $volume.name }}"
+          configMap:
+            name: "{{ $volume.configMapName }}"
+        {{- end }}
+        {{- range $volume := .Values.application.volumes.emptyDirVolumes }}
+        - name: "{{ $.Release.Name }}-{{ $volume.name }}"
+          emptyDir: {}
+        {{- end }}
+        {{- range $volume := .Values.application.volumes.persistentVolumes }}
+        - name: "{{ $.Release.Name }}-{{ $volume.name }}"
+          persistentVolumeClaim:
+            claimName: {{ $.Release.Name }}-{{ $volume.name }}
+        {{- end }}
+
+        {{- if $hasMongo }}
+        - name: ca-cert
+          secret:
+           secretName: {{ .Release.Name }}-mongodb-ca-cert-{{ .Release.Revision }}
+        - name: client-certs
+          secret:
+           secretName: {{ .Release.Name }}-mongodb-client-cert
+        {{- end }}
+
+        {{- if $hasKafka }}
+        - name: kafka-client-certs
+          secret:
+           secretName: kafka-{{ .Release.Name }}
+        - name: kafka-ca-certs
+          secret:
+           secretName: {{ .Values.kafka.clusterName }}-cluster-ca
+        {{- end }}
+{{- end }}

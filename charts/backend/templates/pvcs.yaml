@@ -1,0 +1,25 @@
+{{- range $persistentVolume := .Values.application.volumes.persistentVolumes }}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  annotations:
+    "helm.sh/resource-policy": keep
+  name: {{ $.Release.Name }}-{{ $persistentVolume.name }}
+  namespace: {{ $.Release.Namespace }}
+  labels:
+    app.kubernetes.io/instance: {{ $.Release.Name }}
+    app.kubernetes.io/name: {{ $.Release.Name }}
+    app.kubernetes.io/subsystem: {{ $.Values.application.subsystem | quote }}
+    app.kubernetes.io/tenant: {{ $.Values.tenant.name | quote }}
+    app.kubernetes.io/version: {{ $.Values.application.image.tag | quote }}
+    app: {{ $.Release.Name }}
+    helm.sh/chart: {{ $.Chart.Name }}-{{ $.Chart.Version }}
+spec:
+  accessModes:
+    - {{ $persistentVolume.accessMode }}
+  storageClassName: {{ $persistentVolume.storageClassName }}
+  volumeMode: Filesystem
+  resources:
+    requests:
+      storage: {{ $persistentVolume.size }}
+{{- end }}

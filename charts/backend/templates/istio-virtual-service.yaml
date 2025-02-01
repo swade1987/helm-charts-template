@@ -1,0 +1,39 @@
+{{/*This file configures an Istio VirtualService that points to the backend service.*/}}
+{{- if .Values.istio.enabled }}
+{{- $hostName := include "backend.hostname" . -}}
+apiVersion: networking.istio.io/v1
+kind: VirtualService
+metadata:
+  name: {{ .Release.Name }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app.kubernetes.io/instance: {{ $.Release.Name }}
+    app.kubernetes.io/name: {{ $.Release.Name }}
+    app.kubernetes.io/subsystem: {{ $.Values.application.subsystem | quote }}
+    app.kubernetes.io/tenant: {{ $.Values.tenant.name | quote }}
+    app.kubernetes.io/version: {{ $.Values.application.image.tag | quote }}
+    app: {{ $.Release.Name }}
+    helm.sh/chart: {{ $.Chart.Name }}-{{ $.Chart.Version }}
+spec:
+  hosts:
+    - {{ $hostName }}
+    {{- if .Values.application.ingress.additionalHostnames }}
+    {{- range  .Values.application.ingress.additionalHostnames | split "," }}
+    - {{ . }}
+    {{- end }}
+    {{- end }}
+  gateways:
+    - {{ .Values.istio.ingressGateway.namespace }}/{{ .Values.istio.ingressGateway.name }}
+  http:
+    - route:
+        - destination:
+            host: {{ .Release.Name }}
+      headers:
+        response:
+          remove:
+            - x-powered-by,server
+            - x-envoy-upstream-service-time
+            - x-app-name
+            - x-app-version
+            - x-envoy-upstream-service-time
+{{- end }}

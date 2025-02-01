@@ -1,0 +1,120 @@
+environment: "dev" # This has to configured to either dev, non-prod or prod
+
+tenant:
+  name: "algbra" # This has to configured to either algbra, shared or shoal
+  id: "1234"
+
+application:
+  subsystem: "cards" # This has to configured to either cards, onboarding, modulr, transfers, funds, fiat-accounts, clearbank, marqeta, program-management
+
+  image:
+    repository: registry.devops-algbra.com/microservices/example
+    semver: ">=0.0.0"
+    tag: 0.0.0 # {"$imagepolicy": "backend:account-api:tag"}
+
+  serviceAccount:
+    annotations: {}
+
+  # Extra environment variables that will be passed into pods
+  # THIS IS OPTIONAL JUST USING FOR TESTING
+  env:
+   env_key: env_value
+   env_key_1: env_value_1
+
+  # Extra environment variables (from existing secrets) that will be passed into pods
+  # THIS IS OPTIONAL JUST USING FOR TESTING
+  envFromSecret:
+   - name: SPRING_DATASOURCE_URL
+     secretName: app-secret
+     secretKeyRef: first-key
+
+  resources:
+    limits:
+      cpu: "1.0"
+      memory: 1024Mi
+    requests:
+      cpu: "1.0"
+      memory: 1024Mi
+
+  # THIS IS OPTIONAL JUST USING FOR TESTING
+  ingress:
+    enabled: true
+    domain: "example.com"
+    certArn: "arn1,arn2"
+    wafArn: "arn:aws:wafv2:eu-west-2:506948423141:regional/webacl/app/REDACTED"
+    allowedSourceRanges: "1.2.3.4"
+    logging:
+      enabled: true
+      bucket: "ingress-logging-bucket"
+    additionalHostnames: "foo.acmecorp.com"
+
+  # THIS IS OPTIONAL JUST USING FOR TESTING
+  volumes:
+    persistentVolumes:
+      - name: data
+        accessMode: ReadWriteMany
+        storageClassName: efs-sc-dynamic
+        size: 30Gi
+        mountPath: /datadir
+
+  externalSecrets:
+    database:
+      - parameterStoreLocation: "/infrastructure/database/username"
+        secretKey: DB_USERNAME
+      - parameterStoreLocation: "/infrastructure/database/password"
+        secretKey: DB_PASSWORD
+    application:
+      - parameterStoreLocation: "/infrastructure/certmanager/selfsigned-crt/tlscrt"
+        secretKey: TEST_CERT
+      - parameterStoreLocation: "/infrastructure/certmanager/selfsigned-ca/tlscrt"
+        secretKey: TEST_CA_CERT
+
+    additional:
+      - name: mastercard
+        target:
+          template:
+            engineVersion: v2
+            data:
+              mastercard-api-pkcs: '{{ printf "{{ .pkcskey }}" }}'
+        data:
+          - parameterStoreLocation: "/mastercard/ca-cert"
+            secretKey: pkcskey
+
+kafka:
+  enabled: true
+  clusterName: kafka
+  clusterCASecretName: kafka-cluster-ca
+  schemaRegistryUrl: ""
+
+  topics:
+    - name: transaction.notify
+      create: true
+      operations:
+        - Read
+      config:
+        partitions: 12
+        retention: 86400000  # 1d in milliseconds
+
+    - name: another.topic
+      create: true
+      operations:
+        - Write
+
+    - name: dont.create.topic
+      create: false
+      operations:
+        - Read
+        - Write
+
+mongo:
+  enabled: true
+
+istio:
+  enabled: true
+  authorizationPolicy:
+    enabled: true
+    allowedServiceAccounts:
+      - name: bff
+        namespaces: [ "random" ]
+      - name: webhook-hub
+        # If not specified, the namespace where the helm chart is deployed will be used

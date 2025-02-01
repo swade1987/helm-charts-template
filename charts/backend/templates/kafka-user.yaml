@@ -1,0 +1,42 @@
+{{- if .Values.kafka.enabled }}
+apiVersion: kafka.strimzi.io/v1beta2
+kind: KafkaUser
+metadata:
+  annotations:
+    "helm.sh/hook": pre-install,pre-upgrade
+    "helm.sh/hook-weight": "-1"
+    "helm.sh/resource-policy": keep
+  name: {{ .Release.Name }}
+  labels:
+    strimzi.io/cluster: {{ .Values.kafka.clusterName }}
+    app.kubernetes.io/instance: {{ $.Release.Name }}
+    app.kubernetes.io/name: {{ $.Release.Name }}
+    app.kubernetes.io/subsystem: {{ $.Values.application.subsystem | quote }}
+    app.kubernetes.io/tenant: {{ $.Values.tenant.name | quote }}
+    app.kubernetes.io/version: {{ $.Values.application.image.tag | quote }}
+    app: {{ $.Release.Name }}
+    helm.sh/chart: {{ $.Chart.Name }}-{{ $.Chart.Version }}
+spec:
+  authentication:
+    type: tls
+  authorization:
+    type: simple
+    acls:
+      {{- range .Values.kafka.topics }}
+      - resource:
+          type: topic
+          name: {{ .name }}
+          patternType: literal
+        operations:
+          {{- toYaml .operations | nindent 10 }}
+          - Describe
+        host: "*"
+      {{- end }}
+      - resource:
+          type: group
+          name: {{ $.Release.Name }}-
+          patternType: prefix
+        operations:
+          - Read
+        host: "*"
+{{- end }}
