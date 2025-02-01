@@ -1,8 +1,8 @@
 # See https://github.com/helm/chart-testing#configuration
 chart-dirs:
   - charts
-chart-repos:
-  - helm-charts-template=https://swade1987.github.io/helm-charts-template
+#chart-repos:
+#  - helm-charts-template=https://swade1987.github.io/helm-charts-template
 check-version-increment: true
 helm-extra-args: --timeout 600
 target-branch: main
