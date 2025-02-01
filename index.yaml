@@ -1,0 +1,13 @@
+apiVersion: v1
+entries:
+  backend:
+  - apiVersion: v2
+    created: "2025-02-01T16:34:20.009011514Z"
+    description: A Helm chart for backend microservices
+    digest: cc5122ede2cdc36b2dacb99f8d1920c06cd030e06a080d36f845a0fcb2da07dd
+    name: backend
+    type: application
+    urls:
+    - https://github.com/swade1987/helm-charts-template/releases/download/backend-0.1.0/backend-0.1.0.tgz
+    version: 0.1.0
+generated: "2025-02-01T16:34:20.009018688Z"
