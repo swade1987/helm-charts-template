@@ -1,0 +1,24 @@
+name: conformance
+
+on:
+  pull_request:
+    paths: ['charts/**']
+
+jobs:
+
+  conformance:
+    permissions:
+      contents: read
+    runs-on: ubuntu-latest
+    # ref: https://github.com/swade1987/kubernetes-toolkit/releases/tag/v1.2.0
+    container: eu.gcr.io/swade1987/kubernetes-toolkit:1.2.0
+    steps:
+      - uses: actions/checkout@v4
+      - name: Configure git safe directory
+        run: git config --global --add safe.directory /__w/helm-charts-template/helm-charts-template
+      - name: pluto-checks
+        run: make pluto-checks
+      - name: kubeconform-checks
+        run: make kubeconform-checks
+      - name: istio-checks
+        run: make istio-checks

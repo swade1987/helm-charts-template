@@ -1,0 +1,21 @@
+{{/*This file loops around the application.configMaps defined in the values.yaml file and creates a ConfigMap for each of them. */}}
+{{/*The ConfigMap is created in the same namespace as the release*/}}
+{{/*The data field of the ConfigMap is populated with the data defined in the values.yaml file.*/}}
+{{- range $configMapName, $configMap := .Values.application.configMaps }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ $configMapName }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app.kubernetes.io/instance: {{ $.Release.Name }}
+    app.kubernetes.io/name: {{ $.Release.Name }}
+    app.kubernetes.io/subsystem: {{ $.Values.application.subsystem | quote }}
+    app.kubernetes.io/tenant: {{ $.Values.tenant.name | quote }}
+    app.kubernetes.io/version: {{ $.Values.application.image.tag | quote }}
+    app: {{ $.Release.Name }}
+    helm.sh/chart: {{ $.Chart.Name }}-{{ $.Chart.Version }}
+data:
+  {{- toYaml $configMap.data | nindent 2 }}
+---
+{{- end }}

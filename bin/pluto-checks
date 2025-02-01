@@ -1,0 +1,69 @@
+#!/usr/bin/env bash
+
+set -eou pipefail
+
+# Check if required tools are installed
+for cmd in kubectl jq pluto helm; do
+    if ! command -v $cmd &> /dev/null; then
+        printf "Error: %s could not be found. Please install it first.\n" "$cmd"
+        exit 1
+    fi
+done
+
+# Set root directory
+ROOT_DIR="$(git rev-parse --show-toplevel)"
+cd "${ROOT_DIR}"
+
+PLUTO_VERSION=$(pluto version | sed 's/Version://' | awk '{print $1}')
+printf "INFO - Detecting deprecated Kubernetes API versions using Pluto %s\n" "${PLUTO_VERSION}"
+
+# Get kubernetes version via kubectl
+KUBERNETES_VERSION=$(kubectl version --client=true -o=json | jq -r '.clientVersion.gitVersion')
+printf "INFO - Using Kubernetes version: %s\n" "${KUBERNETES_VERSION}"
+
+# Function to run Pluto on a file
+run_pluto() {
+    local file="$1"
+    printf "INFO - Checking %s for deprecations\n" "$file"
+    if pluto detect "$file" -t "k8s=${KUBERNETES_VERSION}" --output=wide --no-footer; then
+        printf "✅ %s: No deprecations found\n" "$file"
+        return 0
+    else
+        printf "❌ %s: Deprecations detected\n" "$file"
+        return 1
+    fi
+}
+
+# Loop through Helm charts
+for chart in charts/*; do
+    if [ "$chart" == 'charts/README.md' ] || [ "$chart" == 'charts/external-service' ]; then
+        continue
+    fi
+
+    printf "\nChecking %s\n" "${chart#*/}"
+
+    # Attempt to build dependencies
+    printf "Building dependencies for %s\n" "${chart#*/}"
+    if ! helm dependency build "$chart"; then
+        printf "WARNING: Failed to build dependencies for %s. Skipping this chart.\n\n" "${chart#*/}"
+        continue
+    fi
+
+    # Generate YAML from Helm chart
+    helm_output="/tmp/${chart#*/}.yaml"
+    if ! helm template "${chart}" > "$helm_output"; then
+        printf "❌ Failed to generate YAML for %s\n\n" "${chart#*/}"
+        continue
+    fi
+
+    # Run Pluto on the generated YAML
+    if ! run_pluto "$helm_output"; then
+        printf "WARNING: Deprecations found in %s\n\n" "${chart#*/}"
+    fi
+
+    # Clean up temporary file
+    rm "$helm_output"
+done
+
+printf "\nDeprecation detection complete!\n"
+exit 0

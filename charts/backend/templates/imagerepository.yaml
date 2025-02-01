@@ -1,0 +1,20 @@
+{{- if .Values.application.image.semver }}
+apiVersion: image.toolkit.fluxcd.io/v1beta1
+kind: ImageRepository
+metadata:
+  name: {{ .Release.Name }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app.kubernetes.io/instance: {{ $.Release.Name }}
+    app.kubernetes.io/name: {{ $.Release.Name }}
+    app.kubernetes.io/subsystem: {{ $.Values.application.subsystem | quote }}
+    app.kubernetes.io/tenant: {{ $.Values.tenant.name | quote }}
+    app.kubernetes.io/version: {{ $.Values.application.image.tag | quote }}
+    app: {{ $.Release.Name }}
+    helm.sh/chart: {{ $.Chart.Name }}-{{ $.Chart.Version }}
+spec:
+  secretRef:
+    name: {{ .Values.application.imagePullSecretName }}
+  image: {{ .Values.application.image.repository }}
+  interval: 1m0s
+{{- end }}

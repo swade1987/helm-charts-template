@@ -1,0 +1,337 @@
+# -- The environment the application is running in
+environment: ""
+
+tenant:
+  # -- The name of the tenant (either algbra, shared or shoal)
+  name: ""
+  # -- The ID for the tenant
+  id: ""
+
+# -- Determines if the release is a snapshot
+snapshot: false
+
+application:
+
+  # -- The subsystem the application belongs to
+  subsystem: ""
+
+  # -- Whether the release is a snapshot
+  snapshot: false
+
+  dbAccess:
+    # -- The name of the existing secret to use for database access
+    existingSecretName: ""
+
+  # -- Number of replicas to create
+  replicaCount: 1
+  # -- Delay when deploying before we start running liveness checks (bringing the service online)
+  minReadySeconds: 10
+
+  ## Strategy used to replace old Pods by new ones
+  ## Ref: https://kubernetes.io/docs/concepts/workloads/controllers/deployment/#strategy
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 50%
+
+  image:
+    # -- Location of the container image for the actual application
+    repository: registry.devops-algbra.com/microservices/example
+    # -- The version of the application
+    tag: 0.0.0
+    # -- Image pull policy (see https://kubernetes.io/docs/concepts/containers/images/# --updating-images)
+    pullPolicy: Always
+    # -- If set will allow flux to promote images. (i.e 1.0.x)
+    semver: ""
+
+    # -- Additional args when needed. Env vars should always be prefered.
+    args: []
+
+    # -- The Kubernetes secret used to allow pulling the image from a private image registry.
+    imagePullSecretName: ""
+
+    additionalContainers: []
+    #  - name: do-something
+    #    image: "busybox"
+    #    command: ['do', 'something']
+
+    additionalInitContainers: []
+    #  - name: do-something
+    #    image: "busybox"
+    #    command: ['do', 'something']
+
+    # -- Allow for additional ports inside the main container
+    additionalPorts: []
+    # -- - name: metrics
+    # --   containerPort: 9080
+
+  readinessProbe:
+    httpGet:
+      # -- The path within the container to use for probing
+      path: /health
+      # -- The port within the container to use for probing
+      port: http
+    # -- Delay before probe is initiated in seconds
+    initialDelaySeconds: 0
+    # -- When the probe times out in seconds
+    timeoutSeconds: 30
+    # -- Minimum consecutive failures for the probe
+    failureThreshold: 24
+
+  livenessProbe:
+    httpGet:
+      # -- The path within the container to use for probing
+      path: /health
+      # -- The port within the container to use for probing
+      port: http
+    # -- Delay before probe is initiated in seconds
+    initialDelaySeconds: 0
+    # -- When the probe times out in seconds
+    timeoutSeconds: 30
+    # -- Minimum consecutive failures for the probe
+    failureThreshold: 24
+
+  startupProbe:
+    httpGet:
+      # -- The path within the container to use for probing
+      path: /health
+      # -- The port within the container to use for probing
+      port: http
+    # -- How often (in seconds) to perform the probe
+    periodSeconds: 10
+    # -- When the probe times out in seconds
+    timeoutSeconds: 10
+    # -- Minimum consecutive failures for the probe
+    failureThreshold: 30
+
+  container:
+    # -- The HTTP port the container listens on
+    httpPort: 3430
+    # -- The TCP port the container listens on
+    tcpPort: 3431
+
+  # -- A list of Pod annotations.
+  podAnnotations: {}
+
+  service:
+    # -- A list of service annotations
+    annotations: {}
+    ports:
+      http: 80
+      tcp: 81
+
+  serviceAccount:
+    # -- A list of service account annotations
+    annotations: {}
+
+  # -- Allow assigning pods to nodes (see https://kubernetes.io/docs/concepts/configuration/assign-pod-node/)
+  nodeSelector: {}
+
+  # -- Ensure pods are scheduled to appropriate nodes (see https://kubernetes.io/docs/concepts/configuration/taint-and-toleration/)
+  tolerations: []
+  # -- - key: CriticalAddonsOnly
+  # --  operator: Exists
+
+  # -- Extra environment variables that will be passed into pods
+  env: {}
+  # --  key: value
+  # --  key: value
+
+  # -- Extra environment variables (from existing secrets) that will be passed into pods
+  envFromSecret: []
+  # -- - name: SPRING_DATASOURCE_URL
+  # --   secretName: app-secret
+  # --   secretKeyRef: first-key
+
+  resources:
+    limits: {}
+      # -- CPU resource limit (see https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/# --meaning-of-cpu)
+      # -- cpu: "1.0"
+      # -- Memory resource limit (see https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/# --meaning-of-memory)
+      # -- memory: 1024Mi
+    requests: {}
+      # -- CPU resource request (see https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/# --meaning-of-cpu)
+      # -- cpu: 200m
+      # -- Memory resource request (see https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/# --meaning-of-memory)
+      # -- memory: 1024Mi
+
+  autoscaling:
+    # -- Toggle on and off whether to enable the pod autoscaler
+    enabled: true
+    # -- The minimum number of replicas allowed
+    minReplicas: 1
+    # -- The maximum number of replicas allowed
+    maxReplicas: 5
+    # -- The CPU usage threshold percentage before autoscaling
+    targetCPUUtilizationPercentage: 80
+    # -- The memory usage threshold percentage before autoscaling
+    targetMemoryUtilizationPercentage: 80
+
+  ingress:
+    # -- Toggle on and off whether to enable the ingress
+    enabled: false
+    # -- Comma separated CIDRs/IPs of ALBs making request to the pod
+    allowedSourceRanges: ""
+    # -- The domain to use for the ingress
+    domain: ""
+    # -- The prefix to use for the ingress
+    prefix: ""
+    # -- The ARN of the certificate to use for the ingres
+    certArn: ""
+    # -- The ARN of the WAF to use for the ingress
+    wafArn: ""
+    # -- The scheme to use for the ingress
+    scheme: "internet-facing"
+    # -- The name of the ALB group
+    albGroupName: ""
+    # -- The type of target to use for the ingress
+    targetType: "ip"
+    logging:
+      # -- Toggle on and off whether to enable logging
+      enabled: false
+      # -- The S3 bucket to use for logging
+      bucket: "some-s3-bucket"
+
+
+  # -- Files to inject into containers for configuration. See (https://kubernetes.io/docs/tasks/configure-pod-container/configure-pod-configmap/)
+  configMaps:
+#   - ops-tool-client:
+#     data:
+#       default.conf: |
+#        text
+
+  # --# -- Secret mounts & volume mounts
+  # -- Defines volumes and volumeMounts for secrets, configMaps, emptyDirs and persistentVolumes
+  volumes:
+    # -- Map secrets to volumes. (See  https://kubernetes.io/docs/concepts/storage/volumes/)
+    secretVolumes: []
+    # --      - name: secret-files
+    # --        secretName: some-secret-files
+    # --        mountPath: /testing
+
+    # -- Additional config map volumes (see values.yaml for an example)
+    configMapVolumes: []
+    # --      - name: config-map-files
+    # --        configMapName: config-map-name
+    # --        mountPath: /testing
+
+    # -- A list of emptyDir volumes
+    emptyDirVolumes: []
+#      - name: empty-dir
+#        mountPath: /testing
+
+    # -- A list of persistent volumes to create
+    persistentVolumes: []
+#    - name: data
+#      accessMode: ReadWriteMany
+#      storageClassName: efs-sc-dynamic
+#      size: 30Gi
+#      mountPath: /datadir
+
+  # -- External Secret Configuration
+  externalSecrets:
+    # -- Configuration for database secret
+    database: []
+    # -- Configuration for application secret (not database)
+    application: []
+  #    - parameterStoreLocation: "/infrastructure/certmanager/selfsigned-ca/tlscrt"
+  #      secretKey: TEST_CERT
+  #    - parameterStoreLocation: "/infrastructure/certmanager/selfsigned-ca/tlscrt"
+  #      secretKey: foo
+
+    # -- Additional external secrets
+    additional: []
+
+apm:
+  serverUrl: "http://apm-server-apm-server.logging.svc.cluster.local:8200"
+
+kafka:
+  # -- Enable Kafka
+  enabled: false
+  # -- Kafka Cluster Name
+  clusterName: kafka
+  # -- Schema Registry URL (defaults to http:// algbra-schema-registry.microservices.svc.cluster.local:8081 if not set)
+  schemaRegistryUrl: ""
+
+  # -- Kafka Default Cluster Configuration
+  defaults:
+    config:
+      # -- Kafka Cluster Partitions (default 9)
+      partitions: 9
+      # -- Kafka Cluster Replicas (default 3)
+      replicas: 3
+      # -- Kafka Cluster Retention (default -1 means infinite retention)
+      retention: -1  # -1 means infinite retention
+      # -- Kafka Cluster Segment Bytes (default 1073741824)
+      segmentBytes: 1073741824
+
+    # -- Kafka Topics
+  topics: []
+#    - name: transaction.notify
+#      create: true
+#      operations:
+#        - Read
+#      config:
+#        partitions: 12
+#        retention: 86400000  # 1d in milliseconds
+#
+#    - name: another.topic
+#      create: true
+#      operations:
+#        - Write
+#
+#    - name: dont.create.topic
+#      create: false
+#      operations:
+#        - Read
+#        - Write
+
+mongo:
+  enabled: false
+
+## -- Istio configuration
+istio:
+  enabled: false
+  # -- A list of outbound ports to be excluded from redirection to Envoy
+  excludedOutboundPorts: {}
+  # -- A list of IP ranges in CIDR form to be excluded from redirection.
+  excludeOutboundIPRanges: {}
+  # -- Istio Authorization Policy Configuration
+  ingressGateway:
+    # -- The istio ingress gateway namespace
+    namespace: istio-system
+    # -- The istio ingress gateway name
+    name: istio-ingressgateway
+
+  authorizationPolicy:
+    enabled: false
+    # -- Allow all traffic from one or more namespaces
+    allowedNamespaces: []
+    # -- More granular control per service account if needed (name, namespaces (optional array to override default))
+    allowedServiceAccounts: []
+    #    - name: bff
+    #      # -- Override defaul[]namespaces per SA if needed
+    #      namespaces: ["random"]
+    #      # Additional per-SA configurations could go here
+    #    - name: webhook-hub
+
+    # -- Additional rules could be added here
+    additionalRules: []
+
+# -- The security contexts at the pod level
+podSecurityContext: {}
+#  runAsUser: 1000
+#  runAsGroup: 1000
+#  fsGroup: 1000
+
+# -- The security contexts at the individual container level
+securityContexts:
+  application: {}
+#    runAsUser: 1000
+#    allowPrivilegeEscalation: false
+#    runAsNonRoot: true
+#    capabilities:
+#      drop:
+#        - ALL
+#      add:
+#        - NET_BIND_SERVICE

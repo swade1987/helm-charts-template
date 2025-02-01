@@ -1,0 +1,38 @@
+{{/*This file creates a HorizontalPodAutoscaler resource for the deployment. */}}
+{{/*The autoscaler scales the number of pods in the deployment based on the CPU and memory utilization of the pods. */}}
+{{/*Ref: https://kubernetes.io/docs/tasks/run-application/horizontal-pod-autoscale/*/}}
+{{- if .Values.application.autoscaling.enabled }}
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: {{ .Release.Name }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app.kubernetes.io/instance: {{ $.Release.Name }}
+    app.kubernetes.io/name: {{ $.Release.Name }}
+    app.kubernetes.io/subsystem: {{ $.Values.application.subsystem | quote }}
+    app.kubernetes.io/tenant: {{ $.Values.tenant.name | quote }}
+    app.kubernetes.io/version: {{ $.Values.application.image.tag | quote }}
+    app: {{ $.Release.Name }}
+    helm.sh/chart: {{ $.Chart.Name }}-{{ $.Chart.Version }}
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: {{ .Release.Name }}
+  minReplicas: {{ .Values.application.autoscaling.minReplicas }}
+  maxReplicas: {{ .Values.application.autoscaling.maxReplicas }}
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: {{ .Values.application.autoscaling.targetCPUUtilizationPercentage }}
+    - type: Resource
+      resource:
+        name: memory
+        target:
+          type: Utilization
+          averageUtilization: {{ .Values.application.autoscaling.targetMemoryUtilizationPercentage }}
+{{- end }}

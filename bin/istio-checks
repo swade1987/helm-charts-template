@@ -1,0 +1,61 @@
+#!/usr/bin/env bash
+
+set -eou pipefail
+
+# Check if required tools are installed
+for cmd in istioctl yq helm kubectl jq; do
+    if ! command -v $cmd &> /dev/null; then
+        printf "Error: %s could not be found. Please install it first.\n" "$cmd"
+        exit 1
+    fi
+done
+
+# Set root directory
+ROOT_DIR="$(git rev-parse --show-toplevel)"
+cd "${ROOT_DIR}"
+
+# Get kubernetes version via kubectl
+ISTIOCTL_VERSION=$(istioctl version --remote=false | awk '{print $3}')
+printf "INFO - Validating Helm charts against Istio schemas from %s\n" "${ISTIOCTL_VERSION}"
+
+# Loop through Helm charts
+for chart in charts/*; do
+
+    printf "\nChecking %s\n" "${chart#*/}"
+
+    # Attempt to build dependencies
+    printf "Building dependencies for %s\n" "${chart#*/}"
+    if ! helm dependency build "$chart"; then
+        printf "WARNING: Failed to build dependencies for %s. Skipping this chart.\n" "${chart#*/}"
+        continue
+    fi
+
+    # Generate YAML from Helm chart
+    helm_output="/tmp/${chart#*/}.yaml"
+    if ! helm template "${chart}" > "$helm_output"; then
+        printf "❌ Failed to generate YAML for %s\n\n" "${chart#*/}"
+        exit 1
+    fi
+
+    printf "INFO - Validating %s against Istio schemas from %s\n" "$helm_output" "${ISTIOCTL_VERSION}"
+
+    # Validate YAML
+    if ! yq e 'true' "$helm_output" > /dev/null; then
+        printf "❌ %s is not valid YAML\n\n" "$helm_output"
+        exit 1
+    fi
+
+    # Validate against Kubernetes schemas
+    if istioctl validate -f "$helm_output"; then
+        printf "✅ %s is valid\n\n" "${chart#*/}"
+    else
+        printf "❌ %s has validation errors\n\n" "${chart#*/}"
+        exit 1
+    fi
+
+    # Clean up temporary file
+    rm "$helm_output"
+done
+
+printf "\nValidation complete!\n"
+exit 0

@@ -1,0 +1,69 @@
+{{- if .Values.istio.authorizationPolicy.enabled }}
+apiVersion: security.istio.io/v1
+kind: AuthorizationPolicy
+metadata:
+  name: {{ .Release.Name }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app.kubernetes.io/instance: {{ $.Release.Name }}
+    app.kubernetes.io/name: {{ $.Release.Name }}
+    app.kubernetes.io/subsystem: {{ $.Values.application.subsystem | quote }}
+    app.kubernetes.io/tenant: {{ $.Values.tenant.name | quote }}
+    app.kubernetes.io/version: {{ $.Values.application.image.tag | quote }}
+    app: {{ $.Release.Name }}
+    helm.sh/chart: {{ $.Chart.Name }}-{{ $.Chart.Version }}
+spec:
+  selector:
+    matchLabels:
+      app: {{ .Release.Name }}
+  action: ALLOW
+  rules:
+
+    # Allow Prometheus to scrape metrics
+    - from:
+        - source:
+            principals:
+              - cluster.local/ns/monitoring/sa/prometheus
+      to:
+        - operation:
+            methods:
+              - GET
+            paths:
+              - /metrics
+
+    {{- if .Values.application.ingress.allowedSourceRanges }}
+    - from:
+        - source:
+            ipBlocks:
+                {{- range .Values.application.ingress.allowedSourceRanges | split "," }}
+              - {{ . }}
+                {{- end }}
+    {{- end }}
+
+    {{- if .Values.istio.authorizationPolicy.allowedNamespaces }}
+    {{- range .Values.istio.authorizationPolicy.allowedNamespaces }}
+    - from:
+        - source:
+            namespaces:
+              - "{{ . }}"
+    {{- end }}
+    {{- end }}
+
+    {{- if .Values.istio.authorizationPolicy.allowedServiceAccounts }}
+    {{- range .Values.istio.authorizationPolicy.allowedServiceAccounts }}
+    - from:
+        - source:
+            principals:
+              - "*/sa/{{ .name }}"
+            namespaces:
+              {{- if .namespaces }}
+              {{- toYaml .namespaces | nindent 14 }}
+              {{- else }}
+              - "{{ $.Release.Namespace }}"
+              {{- end }}
+    {{- end }}
+    {{- end }}
+    {{- with .Values.istio.authorizationPolicy.additionalRules }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+{{- end }}

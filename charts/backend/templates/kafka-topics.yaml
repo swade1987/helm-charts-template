@@ -1,0 +1,31 @@
+{{- if .Values.kafka.enabled }}
+{{- range .Values.kafka.topics }}
+{{- if .create }}
+apiVersion: kafka.strimzi.io/v1beta2
+kind: KafkaTopic
+metadata:
+  annotations:
+    "helm.sh/hook": pre-install,pre-upgrade
+    "helm.sh/hook-weight": "-1"
+    "helm.sh/resource-policy": keep
+  name: {{ .name }}
+  labels:
+    strimzi.io/cluster: {{ $.Values.kafka.clusterName }}
+    app.kubernetes.io/instance: {{ $.Release.Name }}
+    app.kubernetes.io/name: {{ $.Release.Name }}
+    app.kubernetes.io/subsystem: {{ $.Values.application.subsystem | quote }}
+    app.kubernetes.io/tenant: {{ $.Values.tenant.name | quote }}
+    app.kubernetes.io/version: {{ $.Values.application.image.tag | quote }}
+    app: {{ $.Release.Name }}
+    helm.sh/chart: {{ $.Chart.Name }}-{{ $.Chart.Version }}
+spec:
+  {{- $config := .config | default dict }}
+  partitions: {{ $config.partitions | default $.Values.kafka.defaults.config.partitions }}
+  replicas: {{ $config.replicas | default $.Values.kafka.defaults.config.replicas }}
+  config:
+    retention.ms: {{ $config.retention | default $.Values.kafka.defaults.config.retention }}
+    segment.bytes: {{ $config.segmentBytes | default $.Values.kafka.defaults.config.segmentBytes }}
+{{- end }}
+---
+{{- end }}
+{{- end }}

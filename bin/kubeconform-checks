@@ -1,0 +1,65 @@
+#!/usr/bin/env bash
+
+set -eou pipefail
+
+# Check if required tools are installed
+for cmd in kubeconform yq helm kubectl jq; do
+    if ! command -v $cmd &> /dev/null; then
+        printf "Error: %s could not be found. Please install it first.\n" "$cmd"
+        exit 1
+    fi
+done
+
+# Configuration
+kubeconform_flags=("-skip=Secret")
+kubeconform_config=("-strict" "-ignore-missing-schemas" "-schema-location" "default" "-schema-location" "/tmp/flux-schemas" "-schema-location" "/tmp/kubernetes-schemas" "-verbose" "-output" "pretty" "-exit-on-error")
+
+# Set root directory
+ROOT_DIR="$(git rev-parse --show-toplevel)"
+cd "${ROOT_DIR}"
+
+# Get kubernetes version via kubectl
+KUBERNETES_VERSION=$(kubectl version --client=true -o=json | jq -r '.clientVersion.gitVersion')
+printf "INFO - Validating Helm charts against Kubernetes schemas from %s\n" "${KUBERNETES_VERSION}"
+
+# Loop through Helm charts
+for chart in charts/*; do
+
+    printf "\nChecking %s\n" "${chart#*/}"
+
+    # Attempt to build dependencies
+    printf "Building dependencies for %s\n" "${chart#*/}"
+    if ! helm dependency build "$chart"; then
+        printf "WARNING: Failed to build dependencies for %s. Skipping this chart.\n" "${chart#*/}"
+        continue
+    fi
+
+    # Generate YAML from Helm chart
+    helm_output="/tmp/${chart#*/}.yaml"
+    if ! helm template "${chart}" > "$helm_output"; then
+        printf "❌ Failed to generate YAML for %s\n\n" "${chart#*/}"
+        exit 1
+    fi
+
+    printf "INFO - Validating %s against Kubernetes schemas from %s\n" "$helm_output" "${KUBERNETES_VERSION}"
+
+    # Validate YAML
+    if ! yq e 'true' "$helm_output" > /dev/null; then
+        printf "❌ %s is not valid YAML\n\n" "$helm_output"
+        exit 1
+    fi
+
+    # Validate against Kubernetes schemas
+    if kubeconform "${kubeconform_flags[@]}" "${kubeconform_config[@]}" "$helm_output"; then
+        printf "✅ %s is valid\n\n" "${chart#*/}"
+    else
+        printf "❌ %s has validation errors\n\n" "${chart#*/}"
+        exit 1
+    fi
+
+    # Clean up temporary file
+    rm "$helm_output"
+done
+
+printf "\nValidation complete!\n"
+exit 0
