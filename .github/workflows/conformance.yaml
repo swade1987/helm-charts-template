@@ -20,3 +20,5 @@ jobs:
         run: make pluto-checks
       - name: kubeconform-checks
         run: make kubeconform-checks
+      - name: istio-checks
+        run: make istio-checks

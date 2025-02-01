@@ -21,3 +21,6 @@ pluto-checks:
 
 kubeconform-checks:
 	./bin/kubeconform-checks
+
+istio-checks:
+	./bin/istio-checks

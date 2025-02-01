@@ -3,24 +3,20 @@
 set -eou pipefail
 
 # Check if required tools are installed
-for cmd in kubeconform yq helm kubectl jq; do
+for cmd in istioctl yq helm kubectl jq; do
     if ! command -v $cmd &> /dev/null; then
         printf "Error: %s could not be found. Please install it first.\n" "$cmd"
         exit 1
     fi
 done
 
-# Configuration
-kubeconform_flags=("-skip=Secret")
-kubeconform_config=("-strict" "-ignore-missing-schemas" "-schema-location" "default" "-schema-location" "/tmp/flux-schemas" "-schema-location" "/tmp/kubernetes-schemas" "-verbose" "-output" "pretty" "-exit-on-error")
-
 # Set root directory
 ROOT_DIR="$(git rev-parse --show-toplevel)"
 cd "${ROOT_DIR}"
 
 # Get kubernetes version via kubectl
-KUBERNETES_VERSION=$(kubectl version --client=true -o=json | jq -r '.clientVersion.gitVersion')
-printf "INFO - Validating Helm charts against Kubernetes schemas from %s\n" "${KUBERNETES_VERSION}"
+ISTIOCTL_VERSION=$(istioctl version --remote=false | awk '{print $3}')
+printf "INFO - Validating Helm charts against Istio schemas from %s\n" "${ISTIOCTL_VERSION}"
 
 # Loop through Helm charts
 for chart in charts/*; do
@@ -41,7 +37,7 @@ for chart in charts/*; do
         exit 1
     fi
 
-    printf "INFO - Validating %s against Kubernetes schemas from %s\n" "$helm_output" "${KUBERNETES_VERSION}"
+    printf "INFO - Validating %s against Istio schemas from %s\n" "$helm_output" "${ISTIOCTL_VERSION}"
 
     # Validate YAML
     if ! yq e 'true' "$helm_output" > /dev/null; then
@@ -50,7 +46,7 @@ for chart in charts/*; do
     fi
 
     # Validate against Kubernetes schemas
-    if kubeconform "${kubeconform_flags[@]}" "${kubeconform_config[@]}" "$helm_output"; then
+    if istioctl validate -f "$helm_output"; then
         printf "✅ %s is valid\n\n" "${chart#*/}"
     else
         printf "❌ %s has validation errors\n\n" "${chart#*/}"
