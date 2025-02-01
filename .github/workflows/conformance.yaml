@@ -2,7 +2,6 @@ name: conformance
 
 on:
   pull_request:
-    paths: ['charts/**']
 
 jobs:
 
