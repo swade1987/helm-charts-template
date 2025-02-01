@@ -54,9 +54,12 @@ jobs:
       - name: Push charts to GHCR
         run: |
           shopt -s nullglob
+          set -e  # Exit on error
           for pkg in .cr-release-packages/*; do
             if [ -z "${pkg:-}" ]; then
-              break
+              echo "No packages found to push"
+              exit 0
             fi
-            helm push "${pkg}" "oci://ghcr.io/${GITHUB_REPOSITORY_OWNER}/charts"
+            echo "Pushing ${pkg}..."
+            helm push "${pkg}" "oci://ghcr.io/${GITHUB_REPOSITORY_OWNER}/charts" || exit 1
           done
