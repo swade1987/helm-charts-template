@@ -1,7 +1,11 @@
 name: conformance
 
 on:
-  pull_request:
+  pull_request_target:
+    types:
+      - opened
+      - edited
+      - synchronize
 
 jobs:
 
