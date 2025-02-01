@@ -37,4 +37,8 @@ Once Helm is set up properly, add the repository as follows:
 helm repo add helm-charts-template https://swade1987.github.io/helm-charts-template
 ```
 
-You can then run `helm search repo helm-charts-template` to see the charts.
+You can then run the following to see the charts:
+
+```console
+helm search repo helm-charts-template
+```
