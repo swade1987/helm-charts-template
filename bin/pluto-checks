@@ -25,7 +25,7 @@ printf "INFO - Using Kubernetes version: %s\n" "${KUBERNETES_VERSION}"
 run_pluto() {
     local file="$1"
     printf "INFO - Checking %s for deprecations\n" "$file"
-    if pluto detect "$file" -t "k8s=${KUBERNETES_VERSION}" --output=wide --no-footer; then
+    if pluto detect "$file" -t "k8s=${KUBERNETES_VERSION}" --output=wide; then
         printf "✅ %s: No deprecations found\n" "$file"
         return 0
     else
