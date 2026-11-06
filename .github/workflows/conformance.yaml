@@ -11,7 +11,7 @@ jobs:
     # ref: https://github.com/swade1987/kubernetes-toolkit/releases/tag/v1.26.0
     container: eu.gcr.io/swade1987/kubernetes-toolkit:1.26.0
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Configure git safe directory
         run: git config --global --add safe.directory /__w/helm-charts-template/helm-charts-template
       - name: pluto-checks
