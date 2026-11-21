@@ -8,8 +8,8 @@ jobs:
     permissions:
       contents: read
     runs-on: ubuntu-latest
-    # ref: https://github.com/swade1987/kubernetes-toolkit/releases/tag/v1.26.0
-    container: eu.gcr.io/swade1987/kubernetes-toolkit:1.26.0
+    # ref: https://github.com/swade1987/kubernetes-toolkit/releases/tag/v1.68.0
+    container: ghcr.io/swade1987/kubernetes-toolkit:1.68.0
     steps:
       - uses: actions/checkout@v7
       - name: Configure git safe directory
